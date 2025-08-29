@@ -1,6 +1,6 @@
 import { Tender, Client, User, NewTenderData, NewClientData, FinancialRequestType, AssignmentStatus, OEM, Product, Department, Designation, FinancialRequest, BiddingTemplate, NewOemData, NewUserData } from '../types';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api';
 
 // Helper function to handle API responses
 async function handleResponse<T>(response: Response): Promise<T> {
