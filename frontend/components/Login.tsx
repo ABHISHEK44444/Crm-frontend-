@@ -97,6 +97,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         </button>
                     </div>
                 </form>
+                <div className="mt-10 text-center text-xs text-gray-900 dark:text-gray-800">
+                    
+                    
+                </div>
+
                 
             </div>
         </div>
