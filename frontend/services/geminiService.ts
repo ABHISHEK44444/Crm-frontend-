@@ -7,7 +7,9 @@ if (!GEMINI_API_KEY) {
     console.warn("VITE_API_KEY environment variable not set. AI features will not be available. Please create a .env file in the root directory and add VITE_API_KEY=your_key_here.");
 }
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY || '' });
+const API_BASE_URL = (window as any).process?.env?.VITE_API_URL || '/api';
+
+
 
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
