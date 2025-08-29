@@ -1,5 +1,8 @@
 import { Tender, Client, User, NewTenderData, NewClientData, FinancialRequestType, AssignmentStatus, OEM, Product, Department, Designation, FinancialRequest, BiddingTemplate, NewOemData, NewUserData } from '../types';
 
+// Use Vite's env variable for the production API URL.
+// Fall back to the proxy path for local development.
+// Fix: Cast `import.meta` to `any` to access Vite's `env` variables without causing a TypeScript type error.
 const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api';
 
 // Helper function to handle API responses
