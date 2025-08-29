@@ -52,7 +52,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                placeholder="e.g., admin, sales"
+                                placeholder="User"
                                 required
                                 className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-gray-200"
                             />
@@ -69,7 +69,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Hint: password123"
+                                placeholder="Passward"
                                 required
                                 className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-gray-200"
                             />
@@ -97,10 +97,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         </button>
                     </div>
                 </form>
-                 <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
-                    <p>Demo accounts: admin, sales, finance, viewer</p>
-                    <p>Password for all accounts: <span className="font-mono bg-gray-200 dark:bg-slate-700 px-1 py-0.5 rounded">password123</span></p>
-                </div>
+                
             </div>
         </div>
     );
