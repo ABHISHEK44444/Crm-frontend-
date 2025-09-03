@@ -11,6 +11,8 @@ interface UserFormModalProps {
 }
 
 const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, departments, designations, error }) => {
+  const isEditing = !!user;
+
   const [formData, setFormData] = useState({
     name: '',
     role: Role.Viewer,
@@ -18,6 +20,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
     department: '',
     designation: '',
     specializations: '',
+    password: '',
+    confirmPassword: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,6 +35,8 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
         department: user.department || '',
         designation: user.designation || '',
         specializations: user.specializations?.join(', ') || '',
+        password: '',
+        confirmPassword: '',
       });
     }
   }, [user]);
@@ -44,6 +50,18 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
     } catch (_) {
         newErrors.avatarUrl = 'Please enter a valid URL.';
     }
+
+    if (!isEditing) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required.';
+      } else if (formData.password.length < 6) {
+        newErrors.password = 'Password must be at least 6 characters long.';
+      }
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match.';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -55,7 +73,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
         ? formData.specializations.split(',').map(s => s.trim()).filter(Boolean)
         : [];
 
-      const commonData = {
+      const commonData: Omit<NewUserData, 'password'> = {
         name: formData.name,
         role: formData.role,
         avatarUrl: formData.avatarUrl,
@@ -70,7 +88,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
             ...commonData,
         });
       } else { // Adding new user
-        onSave(commonData);
+        onSave({ ...commonData, password: formData.password });
       }
     }
   };
@@ -79,8 +97,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-
-  const isEditing = !!user;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
@@ -111,6 +127,20 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
                 {errors.avatarUrl && <p className="text-red-500 text-xs mt-1">{errors.avatarUrl}</p>}
               </div>
           </div>
+          {!isEditing && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
+                <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
+                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
+                {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="department" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
