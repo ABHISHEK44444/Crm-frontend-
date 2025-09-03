@@ -7,10 +7,10 @@ const authUser = async (req, res) => {
     const { username, password } = req.body;
 
     // In a real app, you would compare a hashed password.
-    // For this demo, we check the plaintext password from the seeder.
-    const user = await User.findOne({ username });
+    // For this demo, we check the plaintext password.
+    const user = await User.findOne({ username }).select('+password');
 
-    if (user && password === 'password123') {
+    if (user && password === user.password) {
         res.json({
             id: user.id,
             name: user.name,
@@ -40,9 +40,13 @@ const getUsers = async (req, res) => {
 // @route   POST /api/users
 // @access  Private/Admin
 const createUser = async (req, res) => {
-    const { name, role, avatarUrl, department, designation, specializations } = req.body;
+    const { name, role, avatarUrl, department, designation, specializations, password } = req.body;
     const username = name.toLowerCase().replace(/\s+/g, '.'); // e.g. "Sales User" -> "sales.user"
     const email = `${username}@mintergraph.com`;
+
+    if (!password) {
+        return res.status(400).json({ message: 'Password is required to create a new user.' });
+    }
 
     const userExists = await User.findOne({ $or: [{ username }, { email }] });
     if (userExists) {
@@ -54,7 +58,7 @@ const createUser = async (req, res) => {
         name,
         username,
         email,
-        password: 'password123', // Default password for new users
+        password: password, // Use provided password
         role,
         avatarUrl: avatarUrl || `https://ui-avatars.com/api/?name=${name.replace(' ', '+')}`,
         status: 'Active',
