@@ -88,7 +88,18 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClo
 
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+            return JSON.parse(storedUser);
+        }
+        return null;
+    } catch (error) {
+        console.error("Failed to parse user from localStorage", error);
+        return null;
+    }
+  });
   const [currentView, _setCurrentView] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -205,6 +216,7 @@ const App: React.FC = () => {
         try {
             const user = await api.login(username, password);
             if (user) {
+                localStorage.setItem('currentUser', JSON.stringify(user));
                 setCurrentUser(user);
                 return true;
             }
@@ -216,6 +228,7 @@ const App: React.FC = () => {
     };
 
   const handleLogout = () => {
+      localStorage.removeItem('currentUser');
       setCurrentUser(null);
       _setCurrentView('dashboard'); // Reset to default view on logout
   };
@@ -822,6 +835,14 @@ const App: React.FC = () => {
     };
     return viewMap[currentView] || 'Dashboard';
   }, [currentView]);
+  
+  if (isLoading) {
+      return (
+        <div className="w-full h-screen flex items-center justify-center bg-gray-100 dark:bg-[#0d1117]">
+            <div className="p-8 text-center text-gray-500">Loading application data...</div>
+        </div>
+      );
+  }
   
   if (!currentUser) {
       return <Login onLogin={handleLogin} />;
