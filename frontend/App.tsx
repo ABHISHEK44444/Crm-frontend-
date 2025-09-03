@@ -90,17 +90,14 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClo
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-            return JSON.parse(storedUser);
-        }
-        return null;
+      const storedUser = sessionStorage.getItem('currentUser');
+      return storedUser ? JSON.parse(storedUser) : null;
     } catch (error) {
-        console.error("Failed to parse user from localStorage", error);
-        return null;
+      console.error("Failed to parse user from sessionStorage", error);
+      return null;
     }
   });
-  const [currentView, _setCurrentView] = useState('dashboard');
+  const [currentView, _setCurrentView] = useState(() => sessionStorage.getItem('currentView') || 'dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -133,7 +130,7 @@ const App: React.FC = () => {
   const [tenderForBidPacket, setTenderForBidPacket] = useState<Tender | null>(null);
 
   const [tenderForFinancialRequest, setTenderForFinancialRequest] = useState<string | null>(null);
-  const [selectedTender, setSelectedTender] = useState<{ tender: Tender; from?: string } | null>(null);
+  const [selectedTender, _setSelectedTender] = useState<{ tender: Tender; from?: string } | null>(null);
   const [editingClient, setEditingClient] = useState<Client | undefined>(undefined);
   const [editingContact, setEditingContact] = useState<{contact?: Contact, clientId: string} | undefined>(undefined);
   const [requestToProcess, setRequestToProcess] = useState<FinancialRequest | undefined>(undefined);
@@ -163,6 +160,14 @@ const App: React.FC = () => {
       deadlineFilter: null as '48h' | '7d' | '15d' | null,
   });
 
+  const setSelectedTender = useCallback((selection: { tender: Tender; from?: string } | null) => {
+    if (selection) {
+        sessionStorage.setItem('selectedTender', JSON.stringify({ tenderId: selection.tender.id, from: selection.from }));
+    } else {
+        sessionStorage.removeItem('selectedTender');
+    }
+    _setSelectedTender(selection);
+  }, []);
   
   const allNotifications = useMemo(() => 
     [...systemAlerts, ...eventNotifications].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()), 
@@ -198,6 +203,7 @@ const App: React.FC = () => {
   }, [tenders, clients]);
 
   const setCurrentView = (view: string) => {
+    sessionStorage.setItem('currentView', view);
     if (view !== 'tenders' && view !== 'my-feed') {
         setSelectedTender(null);
         // Reset filters when leaving tender views
@@ -205,8 +211,8 @@ const App: React.FC = () => {
             statusFilter: 'All',
             userFilter: 'All',
             searchTerm: '',
-            workflowFilter: null,
-            deadlineFilter: null,
+            workflowFilter: null as string | string[] | null,
+            deadlineFilter: null as '48h' | '7d' | '15d' | null,
         });
     }
     _setCurrentView(view);
@@ -216,7 +222,7 @@ const App: React.FC = () => {
         try {
             const user = await api.login(username, password);
             if (user) {
-                localStorage.setItem('currentUser', JSON.stringify(user));
+                sessionStorage.setItem('currentUser', JSON.stringify(user));
                 setCurrentUser(user);
                 return true;
             }
@@ -228,9 +234,11 @@ const App: React.FC = () => {
     };
 
   const handleLogout = () => {
-      localStorage.removeItem('currentUser');
       setCurrentUser(null);
+      sessionStorage.removeItem('currentUser');
       _setCurrentView('dashboard'); // Reset to default view on logout
+      sessionStorage.removeItem('currentView');
+      sessionStorage.removeItem('selectedTender');
   };
 
   const fetchData = useCallback(async () => {
@@ -269,6 +277,25 @@ const App: React.FC = () => {
     }
   }, [currentUser, fetchData]);
 
+  useEffect(() => {
+    if (tenders.length > 0 && !selectedTender) {
+        const storedTenderData = sessionStorage.getItem('selectedTender');
+        if (storedTenderData) {
+            try {
+                const { tenderId, from } = JSON.parse(storedTenderData);
+                const tenderToSelect = tenders.find(t => t.id === tenderId);
+                if (tenderToSelect) {
+                    _setSelectedTender({ tender: tenderToSelect, from });
+                } else {
+                    sessionStorage.removeItem('selectedTender');
+                }
+            } catch (e) {
+                console.error("Failed to parse stored tender data:", e);
+                sessionStorage.removeItem('selectedTender');
+            }
+        }
+    }
+  }, [tenders, selectedTender]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -344,7 +371,7 @@ const App: React.FC = () => {
             _setCurrentView('tenders');
         }
     }
-  }, [tenders, currentUser]);
+  }, [tenders, currentUser, setSelectedTender]);
 
   const handleOpenAiHelper = useCallback((tender: Tender) => {
     setTenderForAiModal(tender);
@@ -411,7 +438,7 @@ const App: React.FC = () => {
         } catch (err) {
             console.error("Failed to update tender", err);
         }
-    }, [selectedTender]);
+    }, [selectedTender, setSelectedTender]);
 
 
   const handleAssignmentResponse = useCallback(async (tenderId: string, status: AssignmentStatus, notes: string) => {
@@ -424,7 +451,7 @@ const App: React.FC = () => {
       } catch (err) {
           console.error("Failed to respond to assignment", err);
       }
-  }, [selectedTender]);
+  }, [selectedTender, setSelectedTender]);
   
   const handleSaveReasonForLoss = (reason: Tender['reasonForLoss'], notes?: string) => {
       if (tenderToUpdateLoss) {
@@ -830,19 +857,11 @@ const App: React.FC = () => {
       'admin': 'Admin Panel',
       'reporting': 'Reporting & MIS',
       'oems': 'OEM Management',
-      'processes': 'Standard Processes',
+      'processes': 'Standard Operating Procedures',
       'notifications': 'Notifications',
     };
     return viewMap[currentView] || 'Dashboard';
   }, [currentView]);
-  
-  if (isLoading) {
-      return (
-        <div className="w-full h-screen flex items-center justify-center bg-gray-100 dark:bg-[#0d1117]">
-            <div className="p-8 text-center text-gray-500">Loading application data...</div>
-        </div>
-      );
-  }
   
   if (!currentUser) {
       return <Login onLogin={handleLogin} />;
