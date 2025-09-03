@@ -188,40 +188,14 @@ export interface PBG extends FinancialRecord {
 
 export interface SecurityDeposit extends FinancialRecord {
     type: 'SD';
-    expiryDate?: string;
+    expiryDate: string;
     status: SDStatus;
 }
 
-export interface TenderFee extends FinancialRecord {
-    type: 'TenderFee';
-}
+export interface TenderFee extends FinancialRecord {}
 
-export enum TenderDocumentType {
-    TenderNotice = 'Tender Notice',
-    TechnicalCompliance = 'Technical Compliance',
-    AuthorizationCertificate = 'Authorization Certificate',
-    TechnicalBid = 'Technical Bid',
-    CommercialBid = 'Commercial Bid',
-    LetterOfAcceptance = 'Letter of Acceptance (LOA/LOI)',
-    PBGDocument = 'Performance Bank Guarantee (PBG)',
-    Contract = 'Contract / Agreement',
-    DeliverySchedule = 'Delivery Schedule',
-    InstallationCertificate = 'Installation Certificate',
-    Invoice = 'Invoice',
-    EMDRefundLetter = 'EMD Refund Letter',
-    ProductBrochure = 'Product Brochure',
-    Other = 'Other',
-}
-
-export interface TenderDocument {
-    id: string;
-    name: string;
-    url: string; // Can be a standard URL or a data URL for previews
-    type: TenderDocumentType;
-    mimeType: string;
-    uploadedAt: string;
-    uploadedById: string;
-}
+export type FinancialInstrument = EMD | PBG | SecurityDeposit;
+export type FinancialInstrumentType = 'emd' | 'pbg' | 'sd' | 'tenderFee';
 
 export interface ChecklistItem {
     id: string;
@@ -229,16 +203,12 @@ export interface ChecklistItem {
     completed: boolean;
 }
 
-export enum AssignmentStatus {
-  Pending = 'Pending',
-  Accepted = 'Accepted',
-  Declined = 'Declined'
-}
-
-export interface AssignmentResponse {
-    status: AssignmentStatus;
-    notes: string;
-    respondedAt: string;
+export interface TenderHistoryLog {
+    userId: string;
+    user: string;
+    action: string;
+    timestamp: string;
+    details?: string;
 }
 
 export interface NegotiationDetails {
@@ -256,30 +226,102 @@ export interface Competitor {
     notes?: string;
 }
 
-export enum PDIStatus {
-    Pending = 'Pending',
-    Scheduled = 'Scheduled',
-    Completed = 'Completed',
-    Failed = 'Failed',
+export interface AppNotification {
+    id: string;
+    message: string;
+    type: 'deadline' | 'expiry' | 'approval' | 'reassignment' | 'assignment';
+    relatedTenderId: string;
+    timestamp: string;
+    recipientId?: string;
+    isRead: boolean;
 }
+
+export type PDIStatus = 'Not Required' | 'Pending' | 'Complete';
+
+export enum TenderDocumentType {
+    TenderNotice = 'Tender Notice',
+    Corrigendum = 'Corrigendum',
+    TechnicalBid = 'Technical Bid',
+    CommercialBid = 'Commercial Bid',
+    PurchaseOrder = 'Purchase Order',
+    Contract = 'Contract',
+    DeliverySchedule = 'Delivery Schedule',
+    WarrantyCertificate = 'OEM Warranty Certificate',
+    InstallationCertificate = 'Installation Certificate',
+    Invoice = 'Invoice',
+    ClientSatisfactoryReport = 'Client Satisfactory Report',
+    Other = 'Other',
+    FinancialRequestAttachment = 'Financial Request Attachment',
+    ProductBrochure = 'Product Brochure',
+    AuthorizationCertificate = 'Authorization Certificate',
+    TechnicalCompliance = 'Technical Compliance',
+    CaseStudy = 'Case Study',
+    LetterOfAcceptance = 'Letter of Acceptance',
+    PBGDocument = 'PBG Document',
+    EMDRefundLetter = 'EMD Refund Letter',
+}
+
+export interface TenderDocument {
+    id: string;
+    name: string;
+    url: string;
+    type: TenderDocumentType;
+    mimeType: string;
+    uploadedAt: string;
+    uploadedById: string; // userId
+}
+
+export interface Product {
+    id: string;
+    name: string;
+    documents: TenderDocument[];
+}
+
+export enum AssignmentStatus {
+    Pending = 'Pending',
+    Accepted = 'Accepted',
+    Declined = 'Declined',
+}
+
+export interface AssignmentResponse {
+    status: AssignmentStatus;
+    notes?: string;
+    respondedAt?: string;
+}
+
+export enum PostAwardStage {
+    LOI = 'LOI/PO Acknowledgement',
+    PBG = 'PBG Submission',
+    Contract = 'Contract Signing',
+    Kickoff = 'Kick-off Meeting',
+    Delivery = 'Delivery & Installation',
+    Acceptance = 'Final Acceptance & Sign-off',
+    Invoicing = 'Invoicing & Payment',
+    Warranty = 'Warranty & Support',
+}
+
+export type ProcessStageStatus = 'Pending' | 'In Progress' | 'Completed' | 'Skipped';
 
 export interface ProcessStageLog {
     userId: string;
     userName: string;
     timestamp: string;
-    action: string;
+    action: string; // e.g., "Status changed to Completed", "Uploaded document: contract.pdf"
 }
+
 export interface ProcessStage {
     status: ProcessStageStatus;
     notes: string;
     documents: TenderDocument[];
     history: ProcessStageLog[];
     updatedAt?: string;
-    updatedById?: string;
+    updatedById?: string; // userId
 }
+
 export type PostAwardProcess = {
-    [key in PostAwardStage]?: ProcessStage
+    [key in PostAwardStage]?: ProcessStage;
 };
+
 
 export interface Tender {
   id: string;
@@ -296,31 +338,35 @@ export interface Tender {
   value: number;
   description: string;
   assignedTo?: string[];
-  assignmentResponses?: Record<string, AssignmentResponse>;
+  assignmentResponses?: { [userId: string]: AssignmentResponse };
   history?: TenderHistoryLog[];
-  checklists?: Record<BidWorkflowStage, ChecklistItem[]>;
+  checklists?: { [key in BidWorkflowStage]?: ChecklistItem[] };
   tenderFee?: TenderFee;
   emd?: EMD;
   pbg?: PBG;
   sd?: SecurityDeposit;
-  gemFee?: { amount: number, status: 'Paid' | 'Unpaid' };
+  gemFee?: {
+    amount: number;
+    status: 'Pending Indent' | 'Indent Raised' | 'Paid';
+  };
   totalQuantity?: number;
   itemCategory?: string;
   minAvgTurnover?: string;
   oemAvgTurnover?: string;
   pastExperienceYears?: number;
   epbgPercentage?: number;
-  epbgDuration?: number;
+  epbgDuration?: number; // in months
   emdAmount?: number;
   source?: string;
   oemId?: string;
   productId?: string;
+  // Workflow-specific data
   preBidMeetingNotes?: string;
-  contractStatus?: string;
+  contractStatus?: 'Drafting' | 'Signed' | 'Expired';
   paymentStatus?: PaymentStatus;
   negotiationDetails?: NegotiationDetails;
   competitors?: Competitor[];
-  cost?: number; // Internal cost for profitability calculation
+  cost?: number;
   amountPaid?: number;
   liquidatedDamages?: number;
   reasonForLoss?: 'Price' | 'Technical' | 'Timeline' | 'Relationship' | 'Other';
@@ -330,20 +376,19 @@ export interface Tender {
   isLOAReceived?: boolean;
   pastPerformance?: string;
   isBidToRaEnabled?: boolean;
-  bidType?: 'Open' | 'Limited';
+  bidType?: 'Open' | 'Limited' | 'Single';
   documentsRequired?: string;
   postAwardProcess?: PostAwardProcess;
   mseExemption?: boolean;
   startupExemption?: boolean;
 }
 
-export type TenderHistoryLog = {
-    userId: string;
-    user: string;
-    action: string;
-    timestamp: string;
-    details?: string;
-};
+export interface NavItem {
+    name: string;
+    icon: React.ReactNode;
+    view: string;
+    roles?: Role[];
+}
 
 export interface NewTenderData {
   title: string;
@@ -352,93 +397,76 @@ export interface NewTenderData {
   value: number;
   deadline: string;
   description: string;
-  source: string;
-}
-
-export interface NewClientData {
-    name: string;
-    industry: string;
-    gstin: string;
-    category: string;
-    status: ClientStatus;
-    notes?: string;
-    potentialValue?: number;
-    source?: ClientAcquisitionSource;
+  source?: string;
 }
 
 export interface ImportedTenderData {
-    tenderNumber?: string;
-    jurisdiction?: string;
-    title?: string;
-    department?: string;
-    clientName?: string;
-    deadline?: string;
-    openingDate?: string;
-    value?: number;
-    totalQuantity?: number;
-    itemCategory?: string;
-    minAvgTurnover?: string;
-    oemAvgTurnover?: string;
-    pastExperienceYears?: number;
-    emdAmount?: number;
-    tenderFeeAmount?: number;
-    epbgPercentage?: number;
-    epbgDuration?: number;
-    pastPerformance?: string;
-    isBidToRaEnabled?: boolean;
-    mseExemption?: boolean;
-    startupExemption?: boolean;
-    bidType?: 'Open' | 'Limited';
-    documentsRequired?: string[];
-    description?: string;
+  tenderNumber?: string;
+  jurisdiction?: string;
+  title?: string;
+  department?: string;
+  clientName?: string;
+  deadline?: string;
+  openingDate?: string;
+  value?: number;
+  description?: string;
+  emdAmount?: number;
+  pbgPercentage?: number;
+  totalQuantity?: number;
+  itemCategory?: string;
+  minAvgTurnover?: string;
+  oemAvgTurnover?: string;
+  pastExperienceYears?: number;
+  epbgPercentage?: number;
+  epbgDuration?: number; // in months
+  pastPerformance?: string;
+  isBidToRaEnabled?: boolean;
+  bidType?: 'Open' | 'Limited' | 'Single';
+  documentsRequired?: string[];
+  mseExemption?: boolean;
+  startupExemption?: boolean;
 }
+
+export interface NewClientData {
+  name: string;
+  industry: string;
+  gstin: string;
+  category: string;
+  status: ClientStatus;
+  notes?: string;
+  potentialValue?: number;
+  source?: ClientAcquisitionSource;
+}
+
+export interface NewOemData {
+    name: string;
+    contactPerson: string;
+    email: string;
+    phone: string;
+    website?: string;
+    area?: string;
+    region?: string;
+    accountManager?: string;
+    accountManagerStatus?: 'Active' | 'Inactive';
+}
+
 
 export interface ContactData {
     name: string;
     role: string;
     email: string;
     phone: string;
-    isPrimary?: boolean;
+    isPrimary: boolean;
 }
 
 export interface NewUserData {
     name: string;
     role: Role;
-    avatarUrl?: string;
+    avatarUrl: string;
     department?: string;
     designation?: string;
     specializations?: string[];
-}
-
-export interface NavItem {
-    name: string;
-    icon: JSX.Element;
-    view: string;
-    roles?: Role[];
-}
-
-export interface FunnelData {
-    name: string;
-    count: number;
-}
-
-export interface SalesLeaderboardData {
-    userId: string;
-    userName: string;
-    avatarUrl: string;
-    valueWon: number;
-    tendersWon: number;
-    winRate: number;
-}
-
-export interface AppNotification {
-    id: string;
-    message: string;
-    type: 'assignment' | 'deadline' | 'reassignment' | 'expiry' | 'approval' | 'system';
-    relatedTenderId: string;
-    timestamp: string;
-    recipientId?: string; // If null/undefined, it's for everyone
-    isRead: boolean;
+    password?: string;
 }
 
 export enum FinancialRequestType {
@@ -452,10 +480,12 @@ export enum FinancialRequestType {
 export enum FinancialRequestStatus {
     PendingApproval = 'Pending Approval',
     Approved = 'Approved',
-    Processed = 'Processed',
     Declined = 'Declined',
+    Processed = 'Processed',
     Refunded = 'Refunded', // For EMD/SD
     Released = 'Released', // For PBG
+    Forfeited = 'Forfeited',
+    Expired = 'Expired',
 }
 
 export interface FinancialRequest {
@@ -466,56 +496,61 @@ export interface FinancialRequest {
     status: FinancialRequestStatus;
     requestedById: string;
     requestDate: string;
+    expiryDate?: string;
     notes?: string;
     approverId?: string;
     approvalDate?: string;
     rejectionReason?: string;
-    expiryDate?: string; // For EMDs/PBGs that require it
+    // Details for the actual instrument once processed
     instrumentDetails?: {
-        mode: 'DD' | 'BG' | 'Online' | 'Cash' | 'N/A';
-        processedDate: string;
+        mode?: 'DD' | 'BG' | 'Online' | 'Cash' | 'N/A';
+        processedDate?: string;
         expiryDate?: string;
         issuingBank?: string;
-        documentUrl?: string;
+        documentUrl?: string; // Scanned copy of DD/BG etc.
     };
 }
 
-export interface SystemActivityLog extends ClientHistoryLog {
-    id: string;
-    entityType: 'Tender' | 'Client' | 'User';
-    entityName: string;
-    entityId: string;
+// Analytics Types
+export interface FunnelData {
+  name: BidWorkflowStage;
+  count: number;
+}
+
+export interface WinLossData {
+    name: string; // Could be client name, user name, etc.
+    won: number;
+    lost: number;
+    total: number;
+}
+
+export interface SalesLeaderboardData {
+    userId: string;
+    userName: string;
+    avatarUrl: string;
+    valueWon: number;
+    tendersWon: number;
+    winRate: number;
 }
 
 export interface BiddingTemplate {
     id: string;
     name: string;
-    content: string;
+    content: string; // Markdown/text content with placeholders like {{tender.title}}
 }
 
-export interface Product {
+export interface SystemActivityLog {
     id: string;
-    name: string;
-    documents: TenderDocument[];
+    timestamp: string;
+    user: string; // user name
+    userId: string;
+    action: string;
+    details?: string;
+    entityType: 'Tender' | 'Client';
+    entityName: string;
+    entityId: string;
 }
-
-export enum PostAwardStage {
-    OrderAcknowledgement = 'Order Acknowledgement',
-    PDI = 'Pre-Dispatch Inspection (PDI)',
-    Dispatch = 'Dispatch',
-    Delivery = 'Delivery & Receipt',
-    Installation = 'Installation & Commissioning',
-    Training = 'User Training',
-    Acceptance = 'Final Acceptance & Sign-off',
-    PaymentProcessing = 'Payment Processing',
-    PBGReturn = 'PBG Return',
-    ProjectClosure = 'Project Closure',
-}
-
-export type ProcessStageStatus = 'Pending' | 'In Progress' | 'Completed' | 'Skipped';
 
 export type StandardProcessState = {
-    [key in BidWorkflowStage]?: string[]; // Array of completed checklist item IDs
+    [key in BidWorkflowStage]?: string[];
 };
-
-export type NewOemData = Omit<OEM, 'id'>;
