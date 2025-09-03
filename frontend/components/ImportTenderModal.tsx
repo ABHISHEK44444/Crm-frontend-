@@ -98,7 +98,9 @@ const ImportTenderModal: React.FC<ImportTenderModalProps> = ({ onClose, onSave }
       const { name, value, type } = e.target;
       
       let processedValue: any = value;
-      if (type === 'number') {
+      if (name === 'documentsRequired') {
+          processedValue = value.split('\n');
+      } else if (type === 'number') {
         processedValue = value === '' ? undefined : Number(value);
       }
       
@@ -173,10 +175,24 @@ const ImportTenderModal: React.FC<ImportTenderModalProps> = ({ onClose, onSave }
                         </div>
                      </div>
                 </div>
-                 
-                 <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description / Item Category</label>
-                    <textarea id="description" name="description" value={extractedData.description || ''} onChange={handleDataChange} rows={3} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></textarea>
+
+                <div>
+                    <h4 className="text-md font-semibold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">Documents &amp; Description</h4>
+                     <div>
+                        <label htmlFor="documentsRequired" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Documents Required from Seller</label>
+                        <textarea
+                            id="documentsRequired"
+                            name="documentsRequired"
+                            value={Array.isArray(extractedData.documentsRequired) ? extractedData.documentsRequired.join('\n') : ''}
+                            onChange={handleDataChange}
+                            rows={4}
+                            className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"
+                        />
+                    </div>
+                    <div className="mt-4">
+                        <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description / Item Category</label>
+                        <textarea id="description" name="description" value={extractedData.description || ''} onChange={handleDataChange} rows={3} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none transition"></textarea>
+                    </div>
                 </div>
             </div>
         );
