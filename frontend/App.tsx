@@ -160,13 +160,25 @@ const App: React.FC = () => {
       deadlineFilter: null as '48h' | '7d' | '15d' | null,
   });
 
-  const setSelectedTender = useCallback((selection: { tender: Tender; from?: string } | null) => {
-    if (selection) {
-        sessionStorage.setItem('selectedTender', JSON.stringify({ tenderId: selection.tender.id, from: selection.from }));
+  const setSelectedTender = useCallback((selection: React.SetStateAction<{ tender: Tender; from?: string } | null>) => {
+    if (typeof selection === 'function') {
+      _setSelectedTender(currentState => {
+        const newState = selection(currentState);
+        if (newState) {
+            sessionStorage.setItem('selectedTender', JSON.stringify({ tenderId: newState.tender.id, from: newState.from }));
+        } else {
+            sessionStorage.removeItem('selectedTender');
+        }
+        return newState;
+      });
     } else {
-        sessionStorage.removeItem('selectedTender');
+      if (selection) {
+          sessionStorage.setItem('selectedTender', JSON.stringify({ tenderId: selection.tender.id, from: selection.from }));
+      } else {
+          sessionStorage.removeItem('selectedTender');
+      }
+      _setSelectedTender(selection);
     }
-    _setSelectedTender(selection);
   }, []);
   
   const allNotifications = useMemo(() => 
@@ -206,7 +218,6 @@ const App: React.FC = () => {
     sessionStorage.setItem('currentView', view);
     if (view !== 'tenders' && view !== 'my-feed') {
         setSelectedTender(null);
-        // Reset filters when leaving tender views
         setTenderListFilters({
             statusFilter: 'All',
             userFilter: 'All',
@@ -236,7 +247,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
       setCurrentUser(null);
       sessionStorage.removeItem('currentUser');
-      _setCurrentView('dashboard'); // Reset to default view on logout
+      _setCurrentView('dashboard'); 
       sessionStorage.removeItem('currentView');
       sessionStorage.removeItem('selectedTender');
   };
@@ -333,7 +344,7 @@ const App: React.FC = () => {
         const diffTime = targetDate.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays >= 0 && diffDays <= 15) { // Notify if within 15 days
+        if (diffDays >= 0 && diffDays <= 15) { 
             const recipients = new Set([...(tender.assignedTo || []), ...adminIds]);
             recipients.forEach(userId => {
                 newAlerts.push({
@@ -423,22 +434,59 @@ const App: React.FC = () => {
       }
   }, [currentUser]);
   
-    const handleUpdateTender = useCallback(async (tenderToUpdate: Tender) => {
-        try {
-            if (tenderToUpdate.status === TenderStatus.Lost && !tenderToUpdate.reasonForLoss) {
-                setTenderToUpdateLoss(tenderToUpdate);
-                setReasonForLossModalOpen(true);
-            } else {
-                const updatedTender = await api.updateTender(tenderToUpdate.id, tenderToUpdate);
-                setTenders(prev => prev.map(t => (t.id === updatedTender.id ? updatedTender : t)));
-                 if (selectedTender && selectedTender.tender.id === updatedTender.id) {
-                    setSelectedTender({ tender: updatedTender, from: selectedTender.from });
-                }
-            }
-        } catch (err) {
-            console.error("Failed to update tender", err);
+  const handleUpdateTender = useCallback(async (tenderToUpdate: Tender) => {
+    if (tenderToUpdate.status === TenderStatus.Lost && !tenderToUpdate.reasonForLoss) {
+        setTenderToUpdateLoss(tenderToUpdate);
+        setReasonForLossModalOpen(true);
+        return;
+    }
+
+    let originalTender: Tender | undefined;
+
+    setTenders(currentTenders => {
+        originalTender = currentTenders.find(t => t.id === tenderToUpdate.id);
+        return currentTenders.map(t =>
+            t.id === tenderToUpdate.id ? tenderToUpdate : t
+        );
+    });
+
+    setSelectedTender(currentSelection => {
+        if (currentSelection && currentSelection.tender.id === tenderToUpdate.id) {
+            return { ...currentSelection, tender: tenderToUpdate };
         }
-    }, [selectedTender, setSelectedTender]);
+        return currentSelection;
+    });
+
+    try {
+        const savedTender = await api.updateTender(tenderToUpdate.id, tenderToUpdate);
+        
+        setTenders(currentTenders => currentTenders.map(t =>
+            t.id === savedTender.id ? savedTender : t
+        ));
+        setSelectedTender(currentSelection => {
+            if (currentSelection && currentSelection.tender.id === savedTender.id) {
+                return { ...currentSelection, tender: savedTender };
+            }
+            return currentSelection;
+        });
+
+    } catch (err) {
+        console.error("Failed to update tender, reverting change.", err);
+        alert("Error: Could not save tender changes to the server. Your changes have been reverted.");
+        
+        if (originalTender) {
+            setTenders(currentTenders => currentTenders.map(t =>
+                t.id === originalTender!.id ? originalTender : t
+            ));
+            setSelectedTender(currentSelection => {
+                if (currentSelection && currentSelection.tender.id === originalTender!.id) {
+                    return { ...currentSelection, tender: originalTender as Tender };
+                }
+                return currentSelection;
+            });
+        }
+    }
+}, [setSelectedTender]);
 
 
   const handleAssignmentResponse = useCallback(async (tenderId: string, status: AssignmentStatus, notes: string) => {
