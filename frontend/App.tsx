@@ -441,15 +441,12 @@ const App: React.FC = () => {
         return;
     }
 
-    let originalTender: Tender | undefined;
+    const originalTender = tenders.find(t => t.id === tenderToUpdate.id);
 
-    setTenders(currentTenders => {
-        originalTender = currentTenders.find(t => t.id === tenderToUpdate.id);
-        return currentTenders.map(t =>
-            t.id === tenderToUpdate.id ? tenderToUpdate : t
-        );
-    });
-
+    // Perform the optimistic UI update immediately
+    setTenders(prevTenders =>
+        prevTenders.map(t => (t.id === tenderToUpdate.id ? tenderToUpdate : t))
+    );
     setSelectedTender(currentSelection => {
         if (currentSelection && currentSelection.tender.id === tenderToUpdate.id) {
             return { ...currentSelection, tender: tenderToUpdate };
@@ -457,36 +454,42 @@ const App: React.FC = () => {
         return currentSelection;
     });
 
+    // Create a clean payload for the API, removing internal fields that should not be sent
+    const updatePayload = { ...tenderToUpdate };
+    delete (updatePayload as any)._id;
+    delete (updatePayload as any).__v;
+
     try {
-        const savedTender = await api.updateTender(tenderToUpdate.id, tenderToUpdate);
+        const savedTender = await api.updateTender(tenderToUpdate.id, updatePayload);
         
-        setTenders(currentTenders => currentTenders.map(t =>
-            t.id === savedTender.id ? savedTender : t
-        ));
+        // On success, sync the state with the authoritative response from the server
+        setTenders(prevTenders =>
+            prevTenders.map(t => (t.id === savedTender.id ? savedTender : t))
+        );
         setSelectedTender(currentSelection => {
             if (currentSelection && currentSelection.tender.id === savedTender.id) {
                 return { ...currentSelection, tender: savedTender };
             }
             return currentSelection;
         });
-
     } catch (err) {
         console.error("Failed to update tender, reverting change.", err);
         alert("Error: Could not save tender changes to the server. Your changes have been reverted.");
         
+        // On failure, revert the optimistic update using the original state
         if (originalTender) {
-            setTenders(currentTenders => currentTenders.map(t =>
-                t.id === originalTender!.id ? originalTender : t
-            ));
+            setTenders(prevTenders =>
+                prevTenders.map(t => (t.id === originalTender.id ? originalTender : t))
+            );
             setSelectedTender(currentSelection => {
-                if (currentSelection && currentSelection.tender.id === originalTender!.id) {
-                    return { ...currentSelection, tender: originalTender as Tender };
+                if (currentSelection && currentSelection.tender.id === originalTender.id) {
+                    return { ...currentSelection, tender: originalTender };
                 }
                 return currentSelection;
             });
         }
     }
-}, [setSelectedTender]);
+}, [tenders, setSelectedTender]);
 
 
   const handleAssignmentResponse = useCallback(async (tenderId: string, status: AssignmentStatus, notes: string) => {
