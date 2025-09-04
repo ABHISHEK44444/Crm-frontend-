@@ -52,14 +52,17 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
     }
 
     if (!isEditing) {
-      if (!formData.password) {
-        newErrors.password = 'Password is required.';
-      } else if (formData.password.length < 6) {
-        newErrors.password = 'Password must be at least 6 characters long.';
-      }
-      if (formData.password !== formData.confirmPassword) {
+        if (!formData.password) {
+            newErrors.password = 'Password is required for new users.';
+        } else if (formData.password.length < 6) {
+            newErrors.password = 'Password must be at least 6 characters long.';
+        }
+    } else if (formData.password && formData.password.length < 6) {
+        newErrors.password = 'New password must be at least 6 characters long.';
+    }
+
+    if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match.';
-      }
     }
 
     setErrors(newErrors);
@@ -73,7 +76,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
         ? formData.specializations.split(',').map(s => s.trim()).filter(Boolean)
         : [];
 
-      const commonData: Omit<NewUserData, 'password'> = {
+      const dataPayload: any = {
         name: formData.name,
         role: formData.role,
         avatarUrl: formData.avatarUrl,
@@ -81,14 +84,15 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
         designation: formData.designation || undefined,
         specializations: specializationsArray,
       };
-
-      if (user) { // Editing
-        onSave({
-            ...user,
-            ...commonData,
-        });
+      
+      if (isEditing) { // Editing
+        if (formData.password) {
+          dataPayload.password = formData.password;
+        }
+        onSave({ ...user, ...dataPayload });
       } else { // Adding new user
-        onSave({ ...commonData, password: formData.password });
+        dataPayload.password = formData.password;
+        onSave(dataPayload as NewUserData);
       }
     }
   };
@@ -127,20 +131,6 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
                 {errors.avatarUrl && <p className="text-red-500 text-xs mt-1">{errors.avatarUrl}</p>}
               </div>
           </div>
-          {!isEditing && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
-                <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
-                {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
-              </div>
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Confirm Password</label>
-                <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
-                {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="department" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
@@ -168,6 +158,28 @@ const UserFormModal: React.FC<UserFormModalProps> = ({ onClose, onSave, user, de
                 <label htmlFor="specializations" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Specializations / Product Focus</label>
                 <input type="text" id="specializations" name="specializations" value={formData.specializations} onChange={handleChange} placeholder="e.g. Cloud, Printers, AI" className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
                  <p className="text-xs text-slate-500 mt-1">Comma-separated list of product categories or skills.</p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-300 dark:border-slate-600">
+                <h3 className="text-base font-semibold text-slate-700 dark:text-slate-300">
+                    {isEditing ? 'Change Password (Optional)' : 'Set Password'}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                <div>
+                    <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        {isEditing ? 'New Password' : 'Password'}
+                    </label>
+                    <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
+                    {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+                </div>
+                <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                        {isEditing ? 'Confirm New Password' : 'Confirm Password'}
+                    </label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2"/>
+                    {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
+                </div>
+                </div>
             </div>
         </form>
 
