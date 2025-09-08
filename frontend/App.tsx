@@ -32,7 +32,6 @@ import ProcessTrackerModal from './components/ProcessTrackerModal';
 import Login from './components/Login';
 import NotificationsView from './components/NotificationsView';
 import { AlertTriangleIcon } from './constants';
-import PasswordResetModal from './components/PasswordResetModal';
 
 
 // Configure the PDF.js worker to ensure it loads correctly.
