@@ -54,10 +54,9 @@ interface DeleteConfirmationModalProps {
   onConfirm: () => void;
   itemName: string;
   itemType: string;
-  isDeleting: boolean;
 }
 
-const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClose, onConfirm, itemName, itemType, isDeleting }) => {
+const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClose, onConfirm, itemName, itemType }) => {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#161b22] rounded-2xl shadow-2xl w-full max-w-md border border-[#30363d]" onClick={(e) => e.stopPropagation()}>
@@ -77,11 +76,11 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClo
             </div>
         </div>
         <div className="p-4 bg-gray-50 dark:bg-[#0d1117] flex justify-end space-x-3 rounded-b-2xl">
-          <button type="button" onClick={onClose} disabled={isDeleting} className="bg-gray-200 dark:bg-[#30363d] text-gray-800 dark:text-gray-200 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-[#444c56] disabled:opacity-50">
+          <button type="button" onClick={onClose} className="bg-gray-200 dark:bg-[#30363d] text-gray-800 dark:text-gray-200 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-[#444c56]">
             Cancel
           </button>
-          <button type="button" onClick={onConfirm} disabled={isDeleting} className="bg-red-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm disabled:opacity-50">
-            {isDeleting ? 'Deleting...' : 'Delete'}
+          <button type="button" onClick={onConfirm} className="bg-red-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm">
+            Delete
           </button>
         </div>
       </div>
@@ -125,7 +124,6 @@ const App: React.FC = () => {
   const [tenderToDelete, setTenderToDelete] = useState<Tender | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userFormError, setUserFormError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
 
 
   // Data State
@@ -634,28 +632,21 @@ const App: React.FC = () => {
     try {
         const newRequest = await api.addFinancialRequest({ tenderId, type, amount, notes, expiryDate });
         setFinancialRequests(prev => [newRequest, ...prev]);
-        // No need to refetch all data, just add the new request
         setFinancialRequestModalOpen(false);
     } catch (err) {
         console.error("Failed to raise financial request:", err);
         // Re-throw the error so the modal can catch it and display a message
         throw err;
     }
-  }, []);
+}, []);
 
   const handleUpdateRequestStatus = useCallback(async (requestId: string, newStatus: FinancialRequestStatus, details?: { reason?: string; instrument?: FinancialRequest['instrumentDetails'] }) => {
-      try {
-          await api.updateFinancialRequest(requestId, { status: newStatus, ...details });
-          // For simplicity in the demo, a full refetch is done here. 
-          // A more optimized solution would be to update the state locally.
-          const requests = await api.getFinancialRequests();
-          setFinancialRequests(requests);
-          const tendersData = await api.getTenders();
-          setTenders(tendersData);
-      } catch (error) {
-          console.error("Failed to update request status:", error);
-      }
-  }, []);
+    await api.updateFinancialRequest(requestId, { status: newStatus, ...details });
+    const requests = await api.getFinancialRequests();
+    setFinancialRequests(requests);
+    const tendersData = await api.getTenders();
+    setTenders(tendersData);
+}, []);
   
  const handleAddOrUpdateUser = async (userData: NewUserData | User) => {
     setUserFormError('');
@@ -750,25 +741,20 @@ const App: React.FC = () => {
 
   const handleDeleteTender = async () => {
     if (!tenderToDelete) return;
-    setIsDeleting(true);
     try {
         await api.deleteTender(tenderToDelete.id);
         setTenders(prev => prev.filter(t => t.id !== tenderToDelete.id));
-        setTenderToDelete(null); 
+        setTenderToDelete(null); // Close modal
         if(selectedTender?.tender.id === tenderToDelete.id) {
-            setSelectedTender(null); 
+            setSelectedTender(null); // If the deleted tender was being viewed, go back to list
         }
     } catch (err) {
         console.error("Failed to delete tender", err);
-        alert('Failed to delete tender. Please try again.');
-    } finally {
-        setIsDeleting(false);
     }
   };
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
-    setIsDeleting(true);
     try {
         await api.deleteUser(userToDelete.id);
         setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
@@ -776,8 +762,7 @@ const App: React.FC = () => {
     } catch (err: any) {
         console.error("Failed to delete user", err);
         alert(`Error deleting user: ${err.message}`);
-    } finally {
-        setIsDeleting(false);
+        setUserToDelete(null);
     }
   };
   
@@ -1063,7 +1048,6 @@ const App: React.FC = () => {
                 itemName={tenderToDelete.title}
                 onClose={() => setTenderToDelete(null)}
                 onConfirm={handleDeleteTender}
-                isDeleting={isDeleting}
             />
         )}
         {userToDelete && (
@@ -1072,7 +1056,6 @@ const App: React.FC = () => {
                 itemName={userToDelete.name}
                 onClose={() => setUserToDelete(null)}
                 onConfirm={handleDeleteUser}
-                isDeleting={isDeleting}
             />
         )}
         {isPrepareBidPacketModalOpen && tenderForBidPacket && (
