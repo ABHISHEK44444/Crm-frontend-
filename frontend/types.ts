@@ -141,6 +141,7 @@ export interface FinancialRecord {
     mode?: 'DD' | 'BG' | 'Online' | 'Cash' | 'N/A';
     submittedDate?: string;
     documentUrl?: string;
+    requestId?: string; // Link back to the FinancialRequest
 }
 
 export enum EMDStatus {
@@ -158,20 +159,13 @@ export enum PBGStatus {
     Released = 'Released',
 }
 
-export enum SDStatus {
-    Paid = 'Paid',
-    RefundPending = 'Refund Pending',
-    Refunded = 'Refunded',
-    Forfeited = 'Forfeited',
-}
-
 export enum PaymentStatus {
     Pending = 'Pending',
     PartiallyPaid = 'Partially Paid',
     Paid = 'Paid',
 }
 
-export type FinancialInstrumentStatus = EMDStatus | PBGStatus | SDStatus;
+export type FinancialInstrumentStatus = EMDStatus | PBGStatus;
 
 export interface EMD extends FinancialRecord {
     type: 'EMD';
@@ -186,16 +180,10 @@ export interface PBG extends FinancialRecord {
     status: PBGStatus;
 }
 
-export interface SecurityDeposit extends FinancialRecord {
-    type: 'SD';
-    expiryDate: string;
-    status: SDStatus;
-}
-
 export interface TenderFee extends FinancialRecord {}
 
-export type FinancialInstrument = EMD | PBG | SecurityDeposit;
-export type FinancialInstrumentType = 'emd' | 'pbg' | 'sd' | 'tenderFee';
+export type FinancialInstrument = EMD | PBG;
+export type FinancialInstrumentType = 'emd' | 'pbg' | 'tenderFee';
 
 export interface ChecklistItem {
     id: string;
@@ -342,9 +330,10 @@ export interface Tender {
   history?: TenderHistoryLog[];
   checklists?: { [key in BidWorkflowStage]?: ChecklistItem[] };
   tenderFee?: TenderFee;
-  emd?: EMD;
-  pbg?: PBG;
-  sd?: SecurityDeposit;
+  emd?: EMD; // Legacy, for backward compatibility
+  pbg?: PBG; // Legacy, for backward compatibility
+  emds?: EMD[];
+  pbgs?: PBG[];
   gemFee?: {
     amount: number;
     status: 'Pending Indent' | 'Indent Raised' | 'Paid';
@@ -470,9 +459,10 @@ export interface NewUserData {
 }
 
 export enum FinancialRequestType {
-    EMD = 'EMD',
+    EMD_BG = 'EMD BG',
+    EMD_DD = 'EMD DD',
+    EMD_Online = 'EMD Online',
     PBG = 'PBG',
-    SD = 'Security Deposit',
     TenderFee = 'Tender Fee',
     Other = 'Other',
 }
