@@ -4,7 +4,7 @@ import { Tender, FinancialRequestType } from '../types';
 interface FinancialRequestModalProps {
   tenders: Tender[];
   onClose: () => void;
-  onSave: (tenderId: string, type: FinancialRequestType, amount: number, notes?: string, expiryDate?: string) => void;
+  onSave: (tenderId: string, type: FinancialRequestType, amount: number, notes?: string, expiryDate?: string) => Promise<void>;
   initialTenderId?: string | null;
 }
 
@@ -15,6 +15,7 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
   const [notes, setNotes] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (tenderId) {
@@ -50,10 +51,20 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      onSave(tenderId, type, Number(amount), notes, expiryDate || undefined);
+    if (!validate()) return;
+    
+    setIsSubmitting(true);
+    setErrors({});
+    try {
+      await onSave(tenderId, type, Number(amount), notes, expiryDate || undefined);
+      // On success, the parent component will close the modal.
+    } catch (err) {
+        console.error("Failed to submit financial request:", err);
+        setErrors({ form: 'An error occurred. Please try again.' });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -64,6 +75,7 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Raise New Financial Request</h2>
         </div>
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-grow space-y-4">
+          {errors.form && <p className="text-red-500 text-sm text-center -mt-2 mb-2">{errors.form}</p>}
           <div>
             <label htmlFor="tenderId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Select Tender</label>
             <select 
@@ -107,7 +119,9 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
         </form>
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end space-x-3">
           <button type="button" onClick={onClose} className="bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold px-4 py-2 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">Cancel</button>
-          <button type="submit" onClick={handleSubmit} className="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm">Submit Request</button>
+          <button type="submit" onClick={handleSubmit} disabled={isSubmitting} className="bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm disabled:bg-indigo-400 disabled:cursor-not-allowed">
+            {isSubmitting ? 'Submitting...' : 'Submit Request'}
+          </button>
         </div>
       </div>
     </div>
