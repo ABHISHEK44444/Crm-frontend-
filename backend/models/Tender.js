@@ -15,6 +15,22 @@ const financialRecordSchema = new mongoose.Schema({
     documentUrl: { type: String },
 });
 
+const emdItemSchema = new mongoose.Schema({
+    ...financialRecordSchema.obj,
+    expiryDate: Date,
+    refundStatus: String,
+    requestId: String, // Link to the financial request
+});
+
+const pbgItemSchema = new mongoose.Schema({
+    ...financialRecordSchema.obj,
+    issuingBank: String,
+    expiryDate: Date,
+    status: String,
+    requestId: String, // Link to the financial request
+});
+
+
 const assignmentResponseSchema = new mongoose.Schema({
     status: { type: String, enum: ['Pending', 'Accepted', 'Declined'], required: true },
     notes: { type: String },
@@ -87,25 +103,21 @@ const tenderSchema = new mongoose.Schema({
     history: [historyLogSchema],
     checklists: { type: Map, of: [checklistItemSchema] },
     tenderFee: financialRecordSchema,
-    emd: {
+    emd: { // Legacy field, new data will go into emds array
         ...financialRecordSchema.obj,
         type: { type: String, default: 'EMD'},
         expiryDate: Date,
         refundStatus: String,
     },
-    pbg: {
+    pbg: { // Legacy field, new data will go into pbgs array
         ...financialRecordSchema.obj,
         type: { type: String, default: 'PBG'},
         issuingBank: String,
         expiryDate: Date,
         status: String,
     },
-    sd: {
-        ...financialRecordSchema.obj,
-        type: { type: String, default: 'SD'},
-        expiryDate: Date,
-        status: String,
-    },
+    emds: [emdItemSchema], // New field for multiple EMDs
+    pbgs: [pbgItemSchema],   // New field for multiple PBGs
     gemFee: {
         amount: Number,
         status: String,
