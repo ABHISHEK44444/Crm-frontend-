@@ -10,7 +10,7 @@ interface FinancialRequestModalProps {
 
 const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, onClose, onSave, initialTenderId }) => {
   const [tenderId, setTenderId] = useState(initialTenderId || '');
-  const [type, setType] = useState<FinancialRequestType>(FinancialRequestType.EMD);
+  const [type, setType] = useState<FinancialRequestType>(FinancialRequestType.EMD_BG);
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
@@ -20,7 +20,7 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
     if (tenderId) {
         const selectedTender = tenders.find(t => t.id === tenderId);
         if (selectedTender) {
-            if (type === FinancialRequestType.EMD) {
+            if (type.startsWith('EMD')) {
                 setAmount((selectedTender.emdAmount || selectedTender.emd?.amount || '').toString());
                 setExpiryDate(selectedTender.emd?.expiryDate ? new Date(selectedTender.emd.expiryDate).toISOString().split('T')[0] : '');
             } else if (type === FinancialRequestType.TenderFee && selectedTender.tenderFee?.amount) {
@@ -43,7 +43,7 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
     const newErrors: Record<string, string> = {};
     if (!tenderId) newErrors.tenderId = 'Please select a tender.';
     if (Number(amount) <= 0) newErrors.amount = 'Amount must be a positive number.';
-    if (type === FinancialRequestType.EMD && !expiryDate) {
+    if (type.startsWith('EMD') && !expiryDate) {
         newErrors.expiryDate = 'Expiry date is required for EMD requests.';
     }
     setErrors(newErrors);
@@ -91,10 +91,10 @@ const FinancialRequestModal: React.FC<FinancialRequestModalProps> = ({ tenders, 
               {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount}</p>}
             </div>
           </div>
-            {(type === FinancialRequestType.EMD || type === FinancialRequestType.PBG || type === FinancialRequestType.SD) && (
+            {(type.startsWith('EMD') || type === FinancialRequestType.PBG) && (
                 <div>
                     <label htmlFor="expiryDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Expiry Date {type === FinancialRequestType.EMD ? <span className="text-red-500">*</span> : '(Optional)'}
+                        Expiry Date {type.startsWith('EMD') ? <span className="text-red-500">*</span> : '(Optional)'}
                     </label>
                     <input type="date" id="expiryDate" name="expiryDate" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} className="w-full bg-slate-100 dark:bg-slate-700 rounded-md p-2" />
                     {errors.expiryDate && <p className="text-red-500 text-xs mt-1">{errors.expiryDate}</p>}
