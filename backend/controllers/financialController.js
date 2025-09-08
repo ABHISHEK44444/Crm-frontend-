@@ -44,22 +44,55 @@ const updateFinancialRequest = async (req, res) => {
             request.approvalDate = new Date();
         }
 
-        if (status === 'Processed' && instrument) {
-            request.instrumentDetails = instrument;
-            // Also update the related tender
-            const tender = await Tender.findOne({ id: request.tenderId });
-            if (tender) {
-                const instrumentType = request.type === 'EMD' ? 'emd' : (request.type === 'PBG' ? 'pbg' : 'sd');
-                if (instrumentType !== 'Other') {
-                    tender[instrumentType] = {
+        const tender = await Tender.findOne({ id: request.tenderId });
+
+        if (tender) {
+            if (status === 'Processed' && instrument) {
+                request.instrumentDetails = instrument;
+                // Map frontend's processedDate to backend's submittedDate schema field
+                const instrumentForTender = { 
+                    ...instrument,
+                    submittedDate: instrument.processedDate
+                };
+                delete instrumentForTender.processedDate;
+
+                if (request.type.startsWith('EMD')) {
+                    if (!tender.emds) tender.emds = [];
+                    const emdMode = request.type.replace('EMD ', ''); // 'EMD BG' -> 'BG'
+                    tender.emds.push({
+                        ...instrumentForTender,
                         amount: request.amount,
-                        ...instrument,
+                        refundStatus: 'Pending',
+                        mode: emdMode,
+                        requestId: request.id,
+                    });
+                } else if (request.type === 'PBG') {
+                    if (!tender.pbgs) tender.pbgs = [];
+                    tender.pbgs.push({
+                        ...instrumentForTender,
+                        amount: request.amount,
+                        status: 'Active',
+                        requestId: request.id,
+                    });
+                } else if (request.type === 'Tender Fee') {
+                    tender.tenderFee = {
+                        amount: request.amount,
+                        ...instrumentForTender
                     };
-                    if(instrumentType === 'emd') tender.emd.refundStatus = 'Pending';
-                    if(instrumentType === 'pbg') tender.pbg.status = 'Active';
-                    await tender.save();
+                }
+            } else if (status === 'Refunded' && request.type.startsWith('EMD')) {
+                const emdToUpdate = tender.emds.find(e => e.requestId === request.id);
+                if (emdToUpdate) {
+                    emdToUpdate.refundStatus = 'Refunded';
+                }
+            } else if (status === 'Released' && request.type === 'PBG') {
+                 const pbgToUpdate = tender.pbgs.find(p => p.requestId === request.id);
+                if (pbgToUpdate) {
+                    pbgToUpdate.status = 'Released';
                 }
             }
+
+            await tender.save();
         }
         
         const updatedRequest = await request.save();
