@@ -32,6 +32,7 @@ import ProcessTrackerModal from './components/ProcessTrackerModal';
 import Login from './components/Login';
 import NotificationsView from './components/NotificationsView';
 import { AlertTriangleIcon } from './constants';
+import PasswordResetModal from './components/PasswordResetModal';
 
 
 // Configure the PDF.js worker to ensure it loads correctly.
@@ -116,6 +117,7 @@ const App: React.FC = () => {
   const [isAiEligibilityCheckModalOpen, setIsAiEligibilityCheckModalOpen] = useState(false);
   const [isProductFormModalOpen, setIsProductFormModalOpen] = useState(false);
   const [isPrepareBidPacketModalOpen, setPrepareBidPacketModalOpen] = useState(false);
+  const [isPasswordResetModalOpen, setIsPasswordResetModalOpen] = useState(false);
   const [requestToDecline, setRequestToDecline] = useState<FinancialRequest | null>(null);
   const [tenderToTrack, setTenderToTrack] = useState<Tender | null>(null);
   const [tenderToDelete, setTenderToDelete] = useState<Tender | null>(null);
@@ -629,6 +631,8 @@ const App: React.FC = () => {
     await api.addFinancialRequest({ tenderId, type, amount, notes, expiryDate });
     const requests = await api.getFinancialRequests();
     setFinancialRequests(requests);
+    const tendersData = await api.getTenders();
+    setTenders(tendersData);
     setFinancialRequestModalOpen(false);
 }, []);
 
@@ -822,10 +826,16 @@ const App: React.FC = () => {
       _setCurrentView('notifications');
   }, []);
 
+  const handlePasswordReset = (email: string) => {
+    // In a real application, this would trigger an API call.
+    // For this demo, we'll just show a confirmation.
+    alert(`If an account exists for ${email}, a password reset link has been sent.`);
+    setIsPasswordResetModalOpen(false);
+  };
+
 
 
   const renderView = () => {
-    if (!currentUser) return null;
     if (isLoading) {
         return <div className="p-8 text-center text-gray-500">Loading application data...</div>;
     }
@@ -836,7 +846,7 @@ const App: React.FC = () => {
         setSelectedTender,
         onAnalyze: handleOpenAiHelper, 
         onEligibilityCheck: handleOpenEligibilityCheck, 
-        currentUser, 
+        currentUser: currentUser!, 
         onAddTender: () => setIsAddTenderModalOpen(true), 
         onImportTender: () => setIsImportTenderModalOpen(true), 
         onUpdateTender: handleUpdateTender,
@@ -852,30 +862,30 @@ const App: React.FC = () => {
     
     switch (currentView) {
       case 'dashboard':
-        const dashboardTenders = currentUser.role === Role.Sales
+        const dashboardTenders = currentUser!.role === Role.Sales
             ? tenders.filter(t => {
-                const isAssigned = (t.assignedTo || []).includes(currentUser.id);
+                const isAssigned = (t.assignedTo || []).includes(currentUser!.id);
                 if (!isAssigned) return false;
-                const response = t.assignmentResponses?.[currentUser.id];
+                const response = t.assignmentResponses?.[currentUser!.id];
                 return response?.status !== AssignmentStatus.Declined;
             })
             : tenders;
-        const dashboardClients = currentUser.role === Role.Sales
+        const dashboardClients = currentUser!.role === Role.Sales
             ? clients.filter(c => dashboardTenders.some(t => t.clientId === c.id))
             : clients;
-        return <Dashboard tenders={dashboardTenders} clients={dashboardClients} currentUser={currentUser} onCardClick={handleNavigateToTendersWithFilter} />;
-      case 'crm': return <CrmView clients={clients} tenders={tenders} onAddClient={() => setIsClientFormOpen(true)} onEditClient={(client) => { setEditingClient(client); setIsClientFormOpen(true); }} onUpdateClient={handleUpdateClient} onLogInteraction={handleLogInteraction} onAddContact={(clientId) => {setEditingContact({clientId}); setIsContactFormOpen(true);}} onEditContact={(clientId, contact) => {setEditingContact({contact, clientId}); setIsContactFormOpen(true)}} onDeleteContact={handleDeleteContact} currentUser={currentUser}/>;
+        return <Dashboard tenders={dashboardTenders} clients={dashboardClients} currentUser={currentUser!} onCardClick={handleNavigateToTendersWithFilter} />;
+      case 'crm': return <CrmView clients={clients} tenders={tenders} onAddClient={() => setIsClientFormOpen(true)} onEditClient={(client) => { setEditingClient(client); setIsClientFormOpen(true); }} onUpdateClient={handleUpdateClient} onLogInteraction={handleLogInteraction} onAddContact={(clientId) => {setEditingContact({clientId}); setIsContactFormOpen(true);}} onEditContact={(clientId, contact) => {setEditingContact({contact, clientId}); setIsContactFormOpen(true)}} onDeleteContact={handleDeleteContact} currentUser={currentUser!}/>;
       case 'tenders': return <TendersView {...tenderViewProps} />;
       case 'my-feed':
         const myFeedTenders = tenders.filter(t => {
-            const isAssignedToCurrentUser = (t.assignedTo || []).includes(currentUser.id);
+            const isAssignedToCurrentUser = (t.assignedTo || []).includes(currentUser!.id);
             if (isAssignedToCurrentUser) {
-                const response = t.assignmentResponses?.[currentUser.id];
+                const response = t.assignmentResponses?.[currentUser!.id];
                 return response?.status !== AssignmentStatus.Declined;
             }
-            if (currentUser.role === Role.Sales) return false;
+            if (currentUser!.role === Role.Sales) return false;
             if (!t.assignedTo || t.assignedTo.length === 0) {
-                 const userSpecializations = new Set(currentUser.specializations || []);
+                 const userSpecializations = new Set(currentUser!.specializations || []);
                  if (userSpecializations.size > 0 && t.itemCategory) {
                     return userSpecializations.has(t.itemCategory);
                  }
@@ -884,13 +894,13 @@ const App: React.FC = () => {
             return false;
         });
         return <TendersView {...tenderViewProps} tenders={myFeedTenders} />;
-      case 'finance': return <FinanceView users={users} tenders={tenders} currentUser={currentUser} financialRequests={financialRequests} onRequestNew={() => handleOpenFinancialRequestModal(undefined)} onUpdateRequestStatus={handleUpdateRequestStatus} onProcessRequest={(req) => { setRequestToProcess(req); setProcessRequestModalOpen(true); }} onDeclineRequest={(req) => setRequestToDecline(req)} />;
-      case 'admin': return <AdminView users={users} currentUser={currentUser} departments={departments} designations={designations} biddingTemplates={biddingTemplates} products={products} onAddUser={() => { setUserFormError(''); setUserFormModalOpen(true); }} onEditUser={(user) => {setUserFormError(''); setEditingUser(user); setUserFormModalOpen(true);}} onUpdateUserStatus={handleUpdateUserStatus} onDeleteUser={setUserToDelete} onSaveDepartment={handleSaveDepartment} onDeleteDepartment={handleDeleteDepartment} onSaveDesignation={handleSaveDesignation} onDeleteDesignation={handleDeleteDesignation} onSaveTemplate={handleSaveTemplate} onDeleteTemplate={handleDeleteTemplate} onAddOrUpdateProduct={handleAddOrUpdateProduct} onEditProduct={(product) => { setEditingProduct(product); setIsProductFormModalOpen(true); }} onDeleteProduct={handleDeleteProduct} />;
+      case 'finance': return <FinanceView users={users} tenders={tenders} currentUser={currentUser!} financialRequests={financialRequests} onRequestNew={() => handleOpenFinancialRequestModal(undefined)} onUpdateRequestStatus={handleUpdateRequestStatus} onProcessRequest={(req) => { setRequestToProcess(req); setProcessRequestModalOpen(true); }} onDeclineRequest={(req) => setRequestToDecline(req)} />;
+      case 'admin': return <AdminView users={users} currentUser={currentUser!} departments={departments} designations={designations} biddingTemplates={biddingTemplates} products={products} onAddUser={() => { setUserFormError(''); setUserFormModalOpen(true); }} onEditUser={(user) => {setUserFormError(''); setEditingUser(user); setUserFormModalOpen(true);}} onUpdateUserStatus={handleUpdateUserStatus} onDeleteUser={setUserToDelete} onSaveDepartment={handleSaveDepartment} onDeleteDepartment={handleDeleteDepartment} onSaveDesignation={handleSaveDesignation} onDeleteDesignation={handleDeleteDesignation} onSaveTemplate={handleSaveTemplate} onDeleteTemplate={handleDeleteTemplate} onAddOrUpdateProduct={handleAddOrUpdateProduct} onEditProduct={(product) => { setEditingProduct(product); setIsProductFormModalOpen(true); }} onDeleteProduct={handleDeleteProduct} />;
       case 'oems': return <OemsView oems={oems} tenders={tenders} onAddOem={() => setOemFormModalOpen(true)} onEditOem={(oem) => {setEditingOem(oem); setOemFormModalOpen(true)}} />;
-      case 'reporting': return <ReportingView tenders={tenders} clients={clients} users={users} financialRequests={financialRequests} activityLog={systemActivityLog} currentUser={currentUser} />;
+      case 'reporting': return <ReportingView tenders={tenders} clients={clients} users={users} financialRequests={financialRequests} activityLog={systemActivityLog} currentUser={currentUser!} />;
       case 'processes': return <ProcessesView standardProcessState={standardProcessState} onUpdate={setStandardProcessState} />;
       case 'notifications': return <NotificationsView notifications={userNotifications} onNotificationClick={navigateToTender} onMarkAllAsRead={handleMarkAllAsRead} />;
-      default: return <Dashboard tenders={tenders} clients={clients} currentUser={currentUser} onCardClick={handleNavigateToTendersWithFilter} />;
+      default: return <Dashboard tenders={tenders} clients={clients} currentUser={currentUser!} onCardClick={handleNavigateToTendersWithFilter} />;
     }
   };
 
@@ -914,38 +924,40 @@ const App: React.FC = () => {
     return viewMap[currentView] || 'Dashboard';
   }, [currentView]);
   
-  if (!currentUser) {
-      return <Login onLogin={handleLogin} />;
-  }
-  
   const clientForDocumentModal = isGenerateDocumentModalOpen && tenderForDocumentModal
     ? clients.find(c => c.id === tenderForDocumentModal.clientId)
     : undefined;
 
   return (
-    <div className="flex bg-gray-100 dark:bg-[#0d1117] min-h-screen">
-      <Sidebar 
-        currentView={currentView} 
-        setCurrentView={setCurrentView} 
-        currentUser={currentUser}
-        isSidebarCollapsed={isSidebarCollapsed}
-        setIsSidebarCollapsed={setIsSidebarCollapsed}
-      />
-      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
-        <Header 
-          title={title} 
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          notifications={userNotifications}
-          onNotificationClick={navigateToTender}
-          onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
-          onViewAllNotifications={handleViewAllNotifications}
-          currentUserParticipationStatus={currentUserParticipationStatus}
-        />
-        <main>
-          {renderView()}
-        </main>
-      </div>
+    <>
+      {!currentUser ? (
+        <Login onLogin={handleLogin} />
+      ) : (
+        <div className="flex bg-gray-100 dark:bg-[#0d1117] min-h-screen">
+          <Sidebar 
+            currentView={currentView} 
+            setCurrentView={setCurrentView} 
+            currentUser={currentUser}
+            isSidebarCollapsed={isSidebarCollapsed}
+            setIsSidebarCollapsed={setIsSidebarCollapsed}
+          />
+          <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+            <Header 
+              title={title} 
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              notifications={userNotifications}
+              onNotificationClick={navigateToTender}
+              onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
+              onViewAllNotifications={handleViewAllNotifications}
+              currentUserParticipationStatus={currentUserParticipationStatus}
+            />
+            <main>
+              {renderView()}
+            </main>
+          </div>
+        </div>
+      )}
 
       {isAiModalOpen && tenderForAiModal && (
         <AiHelper tender={tenderForAiModal} onClose={() => setIsAiModalOpen(false)} />
@@ -960,7 +972,7 @@ const App: React.FC = () => {
         <GenerateDocumentModal 
             tender={tenderForDocumentModal}
             client={clientForDocumentModal}
-            currentUser={currentUser}
+            currentUser={currentUser!}
             templates={biddingTemplates}
             onClose={() => setGenerateDocumentModalOpen(false)}
         />
@@ -1009,7 +1021,7 @@ const App: React.FC = () => {
       {isProductFormModalOpen && (
         <ProductFormModal 
           product={editingProduct} 
-          currentUser={currentUser}
+          currentUser={currentUser!}
           onClose={() => {setIsProductFormModalOpen(false); setEditingProduct(undefined);}} 
           onSave={handleAddOrUpdateProduct}
         />
@@ -1052,13 +1064,19 @@ const App: React.FC = () => {
         {tenderToTrack && (
             <ProcessTrackerModal
                 tender={tenderToTrack}
-                currentUser={currentUser}
+                currentUser={currentUser!}
                 users={users}
                 onClose={() => setTenderToTrack(null)}
                 onSave={handleUpdateProcessTracker}
             />
         )}
-    </div>
+        {isPasswordResetModalOpen && (
+            <PasswordResetModal
+                onClose={() => setIsPasswordResetModalOpen(false)}
+                onSendResetLink={handlePasswordReset}
+            />
+        )}
+    </>
   );
 };
 
