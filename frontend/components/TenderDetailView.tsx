@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Document, Page } from 'react-pdf';
-import { Tender, TenderStatus, User, Role, ChecklistItem, EMD, PBG, SecurityDeposit, TenderFee, BidWorkflowStage, OEM, TenderDocument, TenderDocumentType, Product, AssignmentStatus, AssignmentResponse, FinancialRequest, FinancialRequestType, FinancialRequestStatus } from '../types';
+// Fix: Removed unused and undefined 'SecurityDeposit' type which is not exported from '../types'.
+import { Tender, TenderStatus, User, Role, ChecklistItem, EMD, PBG, TenderFee, BidWorkflowStage, OEM, TenderDocument, TenderDocumentType, Product, AssignmentStatus, AssignmentResponse, FinancialRequest, FinancialRequestType, FinancialRequestStatus } from '../types';
 import { SparklesIcon, UploadCloudIcon, TrashIcon, ExternalLinkIcon, FileTextIcon, PackageIcon, CurrencyDollarIcon, GitBranchIcon, AlertTriangleIcon, PencilIcon, DownloadIcon, ArrowLeftIcon, CheckCircleIcon, SaveIcon } from '../constants';
 import WorkflowStepper from './WorkflowStepper';
 import WorkflowChecklist from './WorkflowChecklist';
@@ -104,23 +105,23 @@ const EditableField: React.FC<EditableFieldProps> = ({ label, name, value, isEdi
 };
 
 
+// Fix: Removed unused and undefined 'SecurityDeposit' type from props.
 interface FinancialCardProps {
     title: string;
-    data?: EMD | PBG | SecurityDeposit | TenderFee;
+    data?: EMD | PBG | TenderFee;
     pendingRequest?: FinancialRequest;
     fallbackAmount?: number;
     children?: React.ReactNode;
 }
 
 const FinancialCard: React.FC<FinancialCardProps> = ({ title, data, pendingRequest, fallbackAmount, children }) => {
-    if (!data?.amount && !pendingRequest && !fallbackAmount && title !== 'Tender Fee') return null;
-
+    if (!data?.amount && !pendingRequest && !fallbackAmount) return null;
+    
     if (data && typeof data.amount === 'number' && !isNaN(data.amount)) {
         const formatDate = (dateString?: string) => dateString ? new Date(dateString).toLocaleDateString('en-IN') : undefined;
         const typedData: any = data;
         const isEmd = title.includes('EMD');
         const isPbg = title.includes('PBG');
-        const isSd = title.includes('SD');
 
         return (
             <div className="bg-gray-50 dark:bg-[#0d1117] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
@@ -129,10 +130,10 @@ const FinancialCard: React.FC<FinancialCardProps> = ({ title, data, pendingReque
                     <InfoRow label="Amount" value={formatCurrency(data.amount)} />
                     <InfoRow label="Mode" value={typedData.mode} />
                     <InfoRow label="Submission Date" value={formatDate(typedData.submittedDate)} />
-                    {(isEmd || isPbg || isSd) && <InfoRow label="Expiry Date" value={formatDate(typedData.expiryDate)} />}
+                    {(isEmd || isPbg) && <InfoRow label="Expiry Date" value={formatDate(typedData.expiryDate)} />}
                     {isEmd && <InfoRow label="Refund Status" value={typedData.refundStatus} />}
                     {isPbg && <InfoRow label="Issuing Bank" value={typedData.issuingBank} />}
-                    {(isPbg || isSd) && <InfoRow label="Status" value={typedData.status} />}
+                    {isPbg && <InfoRow label="Status" value={typedData.status} />}
                 </div>
                 {children}
             </div>
@@ -146,7 +147,6 @@ const FinancialCard: React.FC<FinancialCardProps> = ({ title, data, pendingReque
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
                     <InfoRow label="Amount" value={formatCurrency(pendingRequest.amount)} />
                     <InfoRow label="Status" value={<span className={`px-2 py-0.5 text-xs rounded-full ${getFinancialRequestStatusBadgeClass(pendingRequest.status)}`}>{pendingRequest.status}</span>} />
-                    <InfoRow label="Mode" value={<i>Pending</i>} />
                     <InfoRow label="Requested" value={new Date(pendingRequest.requestDate).toLocaleDateString('en-IN')} />
                 </div>
                 {children}
@@ -155,18 +155,14 @@ const FinancialCard: React.FC<FinancialCardProps> = ({ title, data, pendingReque
     }
 
     const amountToDisplay = (title.includes('EMD') && fallbackAmount) ? fallbackAmount : undefined;
-
-    if (title === 'Tender Fee' && amountToDisplay === undefined && !data?.amount) {
-        return null;
-    }
+    if (!amountToDisplay) return null;
 
     return (
         <div className="bg-gray-50 dark:bg-[#0d1117] border border-gray-200 dark:border-[#30363d] rounded-lg p-4">
             <h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">{title}</h4>
             <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
                 <InfoRow label="Amount" value={amountToDisplay ? formatCurrency(amountToDisplay) : 'N/A'} />
-                <InfoRow label="Mode" value="N/A" />
-                <InfoRow label="Submission Date" value="N/A" />
+                <InfoRow label="Status" value="Not Requested" />
             </div>
             {children}
         </div>
@@ -198,15 +194,53 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
 
     const linkedProduct = useMemo(() => products.find(p => p.id === tender.productId), [products, tender.productId]);
 
-    const findRelevantRequest = (type: FinancialRequestType) => {
-        return (financialRequests || [])
-            .filter(r => r.tenderId === tender.id && r.type === type && ![FinancialRequestStatus.Processed, FinancialRequestStatus.Declined, FinancialRequestStatus.Forfeited, FinancialRequestStatus.Expired, FinancialRequestStatus.Refunded, FinancialRequestStatus.Released].includes(r.status))
-            .sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())[0];
-    };
+    const financialCards = useMemo(() => {
+        const cards = [];
+        const processedTypes = new Set<string>();
 
-    const pendingEmdRequest = findRelevantRequest(FinancialRequestType.EMD);
-    const pendingPbgRequest = findRelevantRequest(FinancialRequestType.PBG);
-    const pendingSdRequest = findRelevantRequest(FinancialRequestType.SD);
+        // 1. Render all processed items from the tender object
+        if (tender.tenderFee?.amount) {
+            cards.push(<FinancialCard key="tender-fee" title="Tender Fee" data={tender.tenderFee} />);
+            processedTypes.add(FinancialRequestType.TenderFee);
+        }
+        (tender.emds || []).forEach(emd => {
+            cards.push(<FinancialCard key={emd.requestId || emd.submittedDate} title={`Earnest Money Deposit (${emd.mode})`} data={{ ...emd, type: 'EMD' }} />);
+            // Normalize type for lookup
+            const requestType = `EMD ${emd.mode}` as FinancialRequestType;
+            processedTypes.add(requestType);
+        });
+        (tender.pbgs || []).forEach(pbg => {
+            cards.push(<FinancialCard key={pbg.requestId || pbg.submittedDate} title="Performance Bank Guarantee (PBG)" data={{ ...pbg, type: 'PBG' }} />);
+            processedTypes.add(FinancialRequestType.PBG);
+        });
+
+        // 2. Find and render the latest pending request for any type NOT yet processed
+        const relevantRequests = (financialRequests || [])
+            .filter(r => r.tenderId === tender.id && ![FinancialRequestStatus.Processed, FinancialRequestStatus.Declined, FinancialRequestStatus.Refunded, FinancialRequestStatus.Released, FinancialRequestStatus.Forfeited, FinancialRequestStatus.Expired].includes(r.status));
+        
+        const latestPendingByType = new Map<FinancialRequestType, FinancialRequest>();
+        relevantRequests.forEach(req => {
+            const existing = latestPendingByType.get(req.type);
+            if (!existing || new Date(req.requestDate) > new Date(existing.requestDate)) {
+                latestPendingByType.set(req.type, req);
+            }
+        });
+
+        latestPendingByType.forEach((req, type) => {
+            if (!processedTypes.has(type)) {
+                cards.push(<FinancialCard key={req.id} title={req.type} pendingRequest={req} />);
+            }
+        });
+        
+        // 3. Fallback for EMD if nothing else is present
+        const hasAnyEmd = cards.some(c => c.props.title.includes('EMD'));
+        if (!hasAnyEmd && tender.emdAmount) {
+             cards.push(<FinancialCard key="emd-fallback" title="Earnest Money Deposit (EMD)" fallbackAmount={tender.emdAmount} />);
+        }
+
+        return cards;
+
+    }, [tender, financialRequests]);
 
 
     useEffect(() => {
@@ -533,7 +567,7 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
     
     const tenderNotices = (tender.documents || []).filter(doc => doc.type === TenderDocumentType.TenderNotice);
     const otherDocuments = (tender.documents || []).filter(doc => doc.type !== TenderDocumentType.TenderNotice);
-    
+
     const renderDocItem = (doc: TenderDocument) => {
         const uploaderName = userMap.get(doc.uploadedById)?.name || 'System';
         const uploadDate = new Date(doc.uploadedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -669,10 +703,9 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
                                 {currentUser.role !== 'Viewer' && <button onClick={() => onFinancialRequest(tender.id)} className="flex items-center space-x-2 text-sm bg-green-500/10 text-green-400 font-semibold px-3 py-1 rounded-lg hover:bg-green-500/20"><CurrencyDollarIcon className="w-4 h-4" /><span>Request Funds</span></button>}
                             </div>
                             <div className="p-6 space-y-4">
-                                <FinancialCard title="Tender Fee" data={tender.tenderFee} />
-                                <FinancialCard title="Earnest Money Deposit (EMD)" data={tender.emd} pendingRequest={pendingEmdRequest} fallbackAmount={tender.emdAmount} />
-                                <FinancialCard title="Performance Bank Guarantee (PBG)" data={tender.pbg} pendingRequest={pendingPbgRequest} />
-                                <FinancialCard title="Security Deposit (SD)" data={tender.sd} pendingRequest={pendingSdRequest} />
+                                {financialCards.length > 0 ? financialCards : (
+                                    <p className="text-sm text-center text-gray-500 dark:text-gray-400 py-4">No financial items for this tender.</p>
+                                )}
                             </div>
                         </div>
 
