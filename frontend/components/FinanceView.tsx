@@ -238,7 +238,7 @@ const FinanceRequestsTab: React.FC<FinanceViewProps> = ({ tenders, financialRequ
                                         {isFinance && req.status === FinancialRequestStatus.Approved && (
                                             <button onClick={() => onProcessRequest(req)} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline text-xs">Process</button>
                                         )}
-                                        {isFinance && req.status === FinancialRequestStatus.Processed && req.type === FinancialRequestType.EMD && (
+                                        {isFinance && req.status === FinancialRequestStatus.Processed && req.type.startsWith('EMD') && (
                                             <button onClick={() => onUpdateRequestStatus(req.id, FinancialRequestStatus.Refunded)} className="font-medium text-blue-600 dark:text-blue-400 hover:underline text-xs">Mark as Refunded</button>
                                         )}
                                     </td>
