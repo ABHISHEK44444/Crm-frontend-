@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { pdfjs } from 'react-pdf';
 import Sidebar from './components/Sidebar';
@@ -32,6 +33,7 @@ import ProcessTrackerModal from './components/ProcessTrackerModal';
 import Login from './components/Login';
 import NotificationsView from './components/NotificationsView';
 import { AlertTriangleIcon } from './constants';
+import PasswordResetModal from './components/PasswordResetModal';
 
 
 // Configure the PDF.js worker to ensure it loads correctly.
@@ -627,12 +629,15 @@ const App: React.FC = () => {
   }, []);
 
   const handleRaiseFinancialRequest = useCallback(async (tenderId: string, type: FinancialRequestType, amount: number, notes?: string, expiryDate?: string) => {
-    await api.addFinancialRequest({ tenderId, type, amount, notes, expiryDate });
-    const requests = await api.getFinancialRequests();
-    setFinancialRequests(requests);
-    const tendersData = await api.getTenders();
-    setTenders(tendersData);
-    setFinancialRequestModalOpen(false);
+    try {
+        const newRequest = await api.addFinancialRequest({ tenderId, type, amount, notes, expiryDate });
+        setFinancialRequests(prev => [newRequest, ...prev]);
+        setFinancialRequestModalOpen(false);
+    } catch (err) {
+        console.error("Failed to raise financial request:", err);
+        // Re-throw the error so the modal can catch it and display a message
+        throw err;
+    }
 }, []);
 
   const handleUpdateRequestStatus = useCallback(async (requestId: string, newStatus: FinancialRequestStatus, details?: { reason?: string; instrument?: FinancialRequest['instrumentDetails'] }) => {
