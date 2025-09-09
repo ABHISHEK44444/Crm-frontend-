@@ -16,7 +16,7 @@ interface TenderDetailViewProps {
     onEligibilityCheck: (tender: Tender) => void;
     currentUser: User;
     users: User[];
-    onUpdateTender: (tender: Tender) => void;
+    onUpdateTender: (tender: Tender) => Promise<void>;
     onAssignmentResponse: (tenderId: string, status: AssignmentStatus, notes: string) => void;
     oems: OEM[];
     products: Product[];
@@ -175,6 +175,7 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
     const canManageAssignments = currentUser.role === Role.Admin;
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [editableTender, setEditableTender] = useState<Tender>(tender);
     const [isEditingAssignment, setIsEditingAssignment] = useState(false);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>(tender.assignedTo || []);
@@ -271,15 +272,31 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
         }));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        setIsSaving(true);
         const newHistoryEntry = {
             userId: currentUser.id,
             user: currentUser.name,
             action: 'Updated Tender Details',
             timestamp: new Date().toISOString(),
         };
-        onUpdateTender({...editableTender, history: [...(tender.history || []), newHistoryEntry]});
+        const tenderToUpdate = { ...editableTender, history: [...(tender.history || []), newHistoryEntry] };
+
+        // Optimistically exit edit mode to make the UI feel fast
         setIsEditing(false);
+
+        try {
+            await onUpdateTender(tenderToUpdate);
+            // If successful, the parent state is already updated.
+        } catch (error) {
+            console.error("Failed to save tender, reverting UI.", error);
+            // The parent component (App.tsx) handles the data revert and alert.
+            // Re-enter edit mode so the user can see their changes and try again.
+            setEditableTender(tenderToUpdate); // Keep user's changes in the form
+            setIsEditing(true);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleCancel = () => {
@@ -666,8 +683,15 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Key Information</h3>
                                 {isEditing ? (
                                     <div className="flex items-center space-x-2">
-                                        <button onClick={handleCancel} className="text-sm bg-gray-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold px-3 py-1 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600">Cancel</button>
-                                        <button onClick={handleSave} className="text-sm bg-cyan-500 text-white font-semibold px-3 py-1 rounded-md hover:bg-cyan-600 shadow-sm">Save</button>
+                                        <button onClick={handleCancel} disabled={isSaving} className="text-sm bg-gray-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold px-3 py-1 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50">Cancel</button>
+                                        <button 
+                                            onClick={handleSave} 
+                                            disabled={isSaving} 
+                                            className="flex items-center justify-center space-x-2 text-sm bg-cyan-600 text-white font-semibold px-3 py-1 rounded-lg shadow-sm disabled:bg-cyan-400 disabled:cursor-wait transition-all duration-200 ease-in-out hover:bg-cyan-500 hover:shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-0.5 active:scale-95 active:bg-cyan-700"
+                                        >
+                                            <SaveIcon className="w-4 h-4" />
+                                            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     <button onClick={() => setIsEditing(true)} className="flex items-center space-x-2 text-sm bg-blue-500/10 text-blue-400 font-semibold px-3 py-1 rounded-lg hover:bg-blue-500/20"><PencilIcon className="w-4 h-4" /><span>Edit</span></button>
