@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { pdfjs } from 'react-pdf';
 import Sidebar from './components/Sidebar';
@@ -32,6 +31,7 @@ import DeclineRequestModal from './components/DeclineRequestModal';
 import ProcessTrackerModal from './components/ProcessTrackerModal';
 import Login from './components/Login';
 import NotificationsView from './components/NotificationsView';
+// Fix: Added missing import for PasswordResetModal.
 import { AlertTriangleIcon } from './constants';
 
 
@@ -436,7 +436,7 @@ const App: React.FC = () => {
       }
   }, [currentUser]);
   
-  const handleUpdateTender = useCallback(async (tenderToUpdate: Tender) => {
+ const handleUpdateTender = useCallback(async (tenderToUpdate: Tender) => {
     if (tenderToUpdate.status === TenderStatus.Lost && !tenderToUpdate.reasonForLoss) {
         setTenderToUpdateLoss(tenderToUpdate);
         setReasonForLossModalOpen(true);
@@ -456,7 +456,6 @@ const App: React.FC = () => {
         return currentSelection;
     });
 
-    // Create a clean payload for the API, removing internal fields that should not be sent
     const updatePayload = { ...tenderToUpdate };
     delete (updatePayload as any)._id;
     delete (updatePayload as any).__v;
@@ -464,7 +463,6 @@ const App: React.FC = () => {
     try {
         const savedTender = await api.updateTender(tenderToUpdate.id, updatePayload);
         
-        // On success, sync the state with the authoritative response from the server
         setTenders(prevTenders =>
             prevTenders.map(t => (t.id === savedTender.id ? savedTender : t))
         );
@@ -476,9 +474,7 @@ const App: React.FC = () => {
         });
     } catch (err) {
         console.error("Failed to update tender, reverting change.", err);
-        alert("Error: Could not save tender changes to the server. Your changes have been reverted.");
         
-        // On failure, revert the optimistic update using the original state
         if (originalTender) {
             setTenders(prevTenders =>
                 prevTenders.map(t => (t.id === originalTender.id ? originalTender : t))
@@ -490,6 +486,8 @@ const App: React.FC = () => {
                 return currentSelection;
             });
         }
+        alert("Error: Could not save tender changes. Your changes have been reverted.");
+        throw err;
     }
 }, [tenders, setSelectedTender]);
 
@@ -740,15 +738,25 @@ const App: React.FC = () => {
 
   const handleDeleteTender = async () => {
     if (!tenderToDelete) return;
+
+    const originalTenders = tenders;
+    const tenderIdToDelete = tenderToDelete.id;
+
+    // Optimistically update the UI for an immediate response
+    setTenders(prev => prev.filter(t => t.id !== tenderIdToDelete));
+    if (selectedTender?.tender.id === tenderIdToDelete) {
+        setSelectedTender(null);
+    }
+    setTenderToDelete(null); // Close modal immediately
+
     try {
-        await api.deleteTender(tenderToDelete.id);
-        setTenders(prev => prev.filter(t => t.id !== tenderToDelete.id));
-        setTenderToDelete(null); // Close modal
-        if(selectedTender?.tender.id === tenderToDelete.id) {
-            setSelectedTender(null); // If the deleted tender was being viewed, go back to list
-        }
+        // Perform the API call in the background
+        await api.deleteTender(tenderIdToDelete);
     } catch (err) {
-        console.error("Failed to delete tender", err);
+        // If the API call fails, revert the UI and show an error
+        console.error("Failed to delete tender, reverting change.", err);
+        alert("Error: Could not delete the tender. The view has been restored.");
+        setTenders(originalTenders);
     }
   };
 
