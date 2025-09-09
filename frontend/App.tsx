@@ -32,7 +32,7 @@ import ProcessTrackerModal from './components/ProcessTrackerModal';
 import Login from './components/Login';
 import NotificationsView from './components/NotificationsView';
 // Fix: Added missing import for PasswordResetModal.
-import { AlertTriangleIcon } from './constants';
+import { AlertTriangleIcon, CheckCircleIcon, InfoIcon, XIcon } from './constants';
 
 
 // Configure the PDF.js worker to ensure it loads correctly.
@@ -87,6 +87,48 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({ onClo
   );
 };
 
+const Toast: React.FC<{ message: string; type: 'info' | 'success' | 'error'; onClose: () => void; }> = ({ message, type, onClose }) => {
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        setVisible(true); // Animate in
+        const timer = setTimeout(() => {
+            handleClose();
+        }, 5000); // Auto-dismiss after 5 seconds
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    const handleClose = useCallback(() => {
+        setVisible(false);
+        setTimeout(onClose, 300); // Wait for animation to finish before removing from DOM
+    }, [onClose]);
+
+    const typeDetails = {
+        info: {
+            classes: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200',
+            icon: <InfoIcon className="w-6 h-6" />,
+        },
+        success: {
+            classes: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-200',
+            icon: <CheckCircleIcon className="w-6 h-6" />,
+        },
+        error: {
+            classes: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200',
+            icon: <AlertTriangleIcon className="w-6 h-6" />,
+        },
+    };
+
+    return (
+        <div className={`fixed bottom-8 right-8 z-[100] flex items-start p-4 max-w-sm w-full rounded-lg shadow-2xl transition-all duration-300 ease-in-out transform ${typeDetails[type].classes} ${visible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+            <div className="flex-shrink-0">{typeDetails[type].icon}</div>
+            <div className="ml-3 text-sm font-medium flex-grow">{message}</div>
+            <button onClick={handleClose} className="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-full inline-flex h-8 w-8 hover:bg-black/10 focus:outline-none" aria-label="Dismiss">
+                <XIcon className="w-5 h-5" />
+            </button>
+        </div>
+    );
+};
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -123,6 +165,7 @@ const App: React.FC = () => {
   const [tenderToDelete, setTenderToDelete] = useState<Tender | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userFormError, setUserFormError] = useState('');
+  const [toast, setToast] = useState<{ id: number; message: string; type: 'info' | 'success' | 'error'; } | null>(null);
 
 
   // Data State
@@ -386,6 +429,10 @@ const App: React.FC = () => {
     }
   }, [tenders, currentUser, setSelectedTender]);
 
+  const showToast = useCallback((message: string, type: 'info' | 'success' | 'error') => {
+    setToast({ id: Date.now(), message, type });
+  }, []);
+
   const handleOpenAiHelper = useCallback((tender: Tender) => {
     setTenderForAiModal(tender);
     setIsAiModalOpen(true);
@@ -440,21 +487,8 @@ const App: React.FC = () => {
     if (tenderToUpdate.status === TenderStatus.Lost && !tenderToUpdate.reasonForLoss) {
         setTenderToUpdateLoss(tenderToUpdate);
         setReasonForLossModalOpen(true);
-        return;
+        throw new Error("Reason for loss is required.");
     }
-
-    const originalTender = tenders.find(t => t.id === tenderToUpdate.id);
-
-    // Perform the optimistic UI update immediately
-    setTenders(prevTenders =>
-        prevTenders.map(t => (t.id === tenderToUpdate.id ? tenderToUpdate : t))
-    );
-    setSelectedTender(currentSelection => {
-        if (currentSelection && currentSelection.tender.id === tenderToUpdate.id) {
-            return { ...currentSelection, tender: tenderToUpdate };
-        }
-        return currentSelection;
-    });
 
     const updatePayload = { ...tenderToUpdate };
     delete (updatePayload as any)._id;
@@ -466,30 +500,23 @@ const App: React.FC = () => {
         setTenders(prevTenders =>
             prevTenders.map(t => (t.id === savedTender.id ? savedTender : t))
         );
+        
         setSelectedTender(currentSelection => {
             if (currentSelection && currentSelection.tender.id === savedTender.id) {
                 return { ...currentSelection, tender: savedTender };
             }
             return currentSelection;
         });
+
+        showToast("Tender saved successfully!", "success");
+
     } catch (err) {
-        console.error("Failed to update tender, reverting change.", err);
-        
-        if (originalTender) {
-            setTenders(prevTenders =>
-                prevTenders.map(t => (t.id === originalTender.id ? originalTender : t))
-            );
-            setSelectedTender(currentSelection => {
-                if (currentSelection && currentSelection.tender.id === originalTender.id) {
-                    return { ...currentSelection, tender: originalTender };
-                }
-                return currentSelection;
-            });
-        }
-        alert("Error: Could not save tender changes. Your changes have been reverted.");
+        console.error("Failed to update tender.", err);
+        showToast(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`, "error");
+        // Re-throw the error so the child component can catch it and handle its UI state.
         throw err;
     }
-}, [tenders, setSelectedTender]);
+}, [setSelectedTender, showToast]);
 
 
   const handleAssignmentResponse = useCallback(async (tenderId: string, status: AssignmentStatus, notes: string) => {
@@ -738,25 +765,15 @@ const App: React.FC = () => {
 
   const handleDeleteTender = async () => {
     if (!tenderToDelete) return;
-
-    const originalTenders = tenders;
-    const tenderIdToDelete = tenderToDelete.id;
-
-    // Optimistically update the UI for an immediate response
-    setTenders(prev => prev.filter(t => t.id !== tenderIdToDelete));
-    if (selectedTender?.tender.id === tenderIdToDelete) {
-        setSelectedTender(null);
-    }
-    setTenderToDelete(null); // Close modal immediately
-
     try {
-        // Perform the API call in the background
-        await api.deleteTender(tenderIdToDelete);
+        await api.deleteTender(tenderToDelete.id);
+        setTenders(prev => prev.filter(t => t.id !== tenderToDelete.id));
+        setTenderToDelete(null); // Close modal
+        if(selectedTender?.tender.id === tenderToDelete.id) {
+            setSelectedTender(null); // If the deleted tender was being viewed, go back to list
+        }
     } catch (err) {
-        // If the API call fails, revert the UI and show an error
-        console.error("Failed to delete tender, reverting change.", err);
-        alert("Error: Could not delete the tender. The view has been restored.");
-        setTenders(originalTenders);
+        console.error("Failed to delete tender", err);
     }
   };
 
@@ -969,6 +986,8 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {isAiModalOpen && tenderForAiModal && (
         <AiHelper tender={tenderForAiModal} onClose={() => setIsAiModalOpen(false)} />
