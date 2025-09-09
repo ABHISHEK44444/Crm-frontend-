@@ -175,7 +175,6 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
     const canManageAssignments = currentUser.role === Role.Admin;
 
     const [isEditing, setIsEditing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
     const [editableTender, setEditableTender] = useState<Tender>(tender);
     const [isEditingAssignment, setIsEditingAssignment] = useState(false);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>(tender.assignedTo || []);
@@ -273,7 +272,6 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
     };
 
     const handleSave = async () => {
-        setIsSaving(true);
         const newHistoryEntry = {
             userId: currentUser.id,
             user: currentUser.name,
@@ -294,8 +292,6 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
             // Re-enter edit mode so the user can see their changes and try again.
             setEditableTender(tenderToUpdate); // Keep user's changes in the form
             setIsEditing(true);
-        } finally {
-            setIsSaving(false);
         }
     };
 
@@ -683,14 +679,13 @@ const TenderDetailView: React.FC<TenderDetailViewProps> = ({ tender, onBack, onA
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Key Information</h3>
                                 {isEditing ? (
                                     <div className="flex items-center space-x-2">
-                                        <button onClick={handleCancel} disabled={isSaving} className="text-sm bg-gray-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold px-3 py-1 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600 disabled:opacity-50">Cancel</button>
+                                        <button onClick={handleCancel} className="text-sm bg-gray-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold px-3 py-1 rounded-md hover:bg-gray-300 dark:hover:bg-slate-600">Cancel</button>
                                         <button 
                                             onClick={handleSave} 
-                                            disabled={isSaving} 
-                                            className="flex items-center justify-center space-x-2 text-sm bg-cyan-600 text-white font-semibold px-3 py-1 rounded-lg shadow-sm disabled:bg-cyan-400 disabled:cursor-wait transition-all duration-200 ease-in-out hover:bg-cyan-500 hover:shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-0.5 active:scale-95 active:bg-cyan-700"
+                                            className="flex items-center justify-center space-x-2 text-sm bg-cyan-600 text-white font-semibold px-3 py-1 rounded-lg shadow-sm transition-all duration-200 ease-in-out hover:bg-cyan-500 hover:shadow-lg hover:shadow-cyan-500/30 transform hover:-translate-y-0.5 active:scale-95 active:bg-cyan-700"
                                         >
                                             <SaveIcon className="w-4 h-4" />
-                                            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+                                            <span>Save</span>
                                         </button>
                                     </div>
                                 ) : (
